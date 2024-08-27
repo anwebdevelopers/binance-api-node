@@ -223,6 +223,26 @@ const bookTickerTransform = m => ({
   bestAskQnt: m.A,
 })
 
+const futuresBookTickerTransform = m => ({
+  updateId: m.u,
+  eventTime: m.E,
+  transactionTime: m.T,
+  symbol: m.s,
+  bestBid: m.b,
+  bestBidQty: m.B,
+  bestAsk: m.a,
+  bestAskQty: m.A,
+})
+
+const deliveryBookTickerTransform = m => ({
+  updateId: m.u,
+  symbol: m.s,
+  bestBid: m.b,
+  bestBidQty: m.B,
+  bestAsk: m.a,
+  bestAskQty: m.A,
+})
+
 const miniTickerTransform = m => ({
   eventType: m.e,
   eventTime: m.E,
@@ -317,13 +337,26 @@ const deliveryTickerTransform = m => ({
   totalTrades: m.n,
 })
 
-const bookTicker = (payload, cb, transform = true) => {
+const bookTicker = (payload, cb, transform = true, variator) => {
   const cache = (Array.isArray(payload) ? payload : [payload]).map(symbol => {
-    const w = openWebSocket(`${endpoints.base}/${symbol.toLowerCase()}@bookTicker`)
+    const w = openWebSocket(
+      `${variator === 'futures'
+        ? endpoints.futures
+        : variator === 'delivery'
+          ? endpoints.delivery
+          : endpoints.base
+      }/${symbol.toLowerCase()}@bookTicker`
+    )
 
     w.onmessage = msg => {
       const obj = JSONbig.parse(msg.data)
-      cb(transform ? bookTickerTransform(obj) : obj)
+      cb(transform
+        ? variator === 'futures'
+          ? futuresBookTickerTransform(obj)
+          : variator === 'delivery'
+            ? deliveryBookTickerTransform(obj)
+            : bookTickerTransform(obj)
+        : obj)
     }
 
     return w
@@ -971,6 +1004,8 @@ export default opts => {
       candles(payload, interval, cb, transform, 'futures'),
     deliveryCandles: (payload, interval, cb, transform) =>
       candles(payload, interval, cb, transform, 'delivery'),
+    futuresBookTicker: (payload, cb, transform) => bookTicker(payload, cb, transform, 'futures'),
+    deliveryBookTicker: (payload, cb, transform) => bookTicker(payload, cb, transform, 'delivery'),
     futuresTicker: (payload, cb, transform) => ticker(payload, cb, transform, 'futures'),
     deliveryTicker: (payload, cb, transform) => ticker(payload, cb, transform, 'delivery'),
     futuresAllTickers: (cb, transform) => allTickers(cb, transform, 'futures'),
